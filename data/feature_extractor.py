@@ -71,6 +71,7 @@ def extract_embedding(model, sequence: str) -> torch.Tensor:
     
     with torch.no_grad():
         with torch.autocast(device_type='cuda', dtype=torch.float16):
+            onehot_tensor = onehot_tensor.permute(0, 2, 1)
             outputs = model(onehot_tensor, return_embeddings=True)
             
             if isinstance(outputs, dict):
