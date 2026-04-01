@@ -10,8 +10,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-INPUT_FILE = 'significant_hippocampus_snps.pkl'
-OUTPUT_FILE = 'borzoi_ready_sequences.pkl'
+INPUT_FILE = '/content/drive/MyDrive/BrainGen-Agent/data/significant_hippocampus_snps.pkl'
+OUTPUT_FILE = '/content/drive/MyDrive/BrainGen-Agent/data/borzoi_ready_sequences.pkl'
 
 VARIATION_API_BASE = 'https://rest.ensembl.org/variation/human'
 SEQUENCE_API_BASE = 'https://rest.ensembl.org/sequence/region/human'
