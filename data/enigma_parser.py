@@ -14,9 +14,9 @@ OUTPUT_FILE = 'significant_hippocampus_snps.pkl'
 CHUNKSIZE = 100000
 PVAL_THRESHOLD = 5e-8
 
-COL_MARKER = 'MarkerName'
-COL_EFFECT = 'Effect'
-COL_PVAL = 'Pval'
+COL_MARKER = 'RSID'
+COL_EFFECT = 'Effect_Beta'
+COL_PVAL = 'Pvalue'
 
 def parse_enigma_data():
     significant_snps = []
@@ -27,7 +27,7 @@ def parse_enigma_data():
     logger.info(f"P值阈值: {PVAL_THRESHOLD}")
     
     try:
-        for chunk in pd.read_table(INPUT_FILE, compression='gzip', chunksize=CHUNKSIZE):
+        for chunk in pd.read_table(INPUT_FILE, compression='gzip', chunksize=CHUNKSIZE, sep=r'\s+'):
             chunk_count += 1
             logger.info(f"正在处理第 {chunk_count} 块数据...")
             
