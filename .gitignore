@@ -1,0 +1,16 @@
+# 忽略所有原始压缩数据
+*.gz
+*.tar.gz
+*.zip
+
+# 忽略所有生成的特征/中间数据
+*.pkl
+*.npy
+*.pt
+
+# 忽略 Python 缓存
+__pycache__/
+*.pyc
+
+# 确保只忽略 data 目录下的数据文件，但不忽略里面的 .py 代码脚本
+data/raw_enigma/
