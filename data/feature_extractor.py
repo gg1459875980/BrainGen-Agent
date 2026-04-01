@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import numpy as np
 import pandas as pd
 import pickle
@@ -72,6 +73,15 @@ def extract_embedding(model, sequence: str) -> torch.Tensor:
     with torch.no_grad():
         with torch.autocast(device_type='cuda', dtype=torch.float16):
             onehot_tensor = onehot_tensor.permute(0, 2, 1)
+            
+            target_len = 131072
+            current_len = onehot_tensor.shape[-1]
+            if current_len < target_len:
+                pad_total = target_len - current_len
+                pad_left = pad_total // 2
+                pad_right = pad_total - pad_left
+                onehot_tensor = F.pad(onehot_tensor, (pad_left, pad_right), "constant", 0)
+            
             outputs = model(onehot_tensor, return_embeddings=True)
             
             if isinstance(outputs, dict):
