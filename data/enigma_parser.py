@@ -9,8 +9,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-INPUT_FILE = 'raw/ENIGMA2_MeanHippocampus_Combined_GenomeControlled_Jan23.tbl.gz'
-OUTPUT_FILE = 'significant_hippocampus_snps.pkl'
+INPUT_FILE = '/content/drive/MyDrive/BrainGen-Agent/data/raw/ENIGMA2_MeanHippocampus_Combined_GenomeControlled_Jan23.tbl.gz'
+OUTPUT_FILE = '/content/drive/MyDrive/BrainGen-Agent/data/significant_hippocampus_snps.pkl'
 CHUNKSIZE = 100000
 PVAL_THRESHOLD = 5e-8
 
