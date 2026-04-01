@@ -60,13 +60,13 @@ def dna_to_onehot(sequence: str) -> torch.Tensor:
     return tensor
 
 def load_borzoi_model():
+    global MODEL
+    
     logger.info("加载Borzoi模型...")
     
     try:
         from borzoi import Borzoi
         from borzoi import load_model
-        
-        global MODEL
         
         MODEL = load_model()
         MODEL = MODEL.to(DEVICE)
@@ -83,8 +83,6 @@ def load_borzoi_model():
         try:
             from enformer_pytorch import Enformer
             from enformer_pytorch import load_enformer_weights
-            
-            global MODEL
             
             MODEL = Enformer.from_pretrained('EleutherAI/enformer')
             MODEL = MODEL.to(DEVICE)
