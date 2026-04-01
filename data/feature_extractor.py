@@ -1,9 +1,8 @@
 import torch
-import torch.nn as nn
 import numpy as np
+import pandas as pd
 import pickle
 import logging
-from typing import Dict, List, Optional
 
 logging.basicConfig(
     level=logging.INFO,
@@ -14,17 +13,11 @@ logger = logging.getLogger(__name__)
 INPUT_FILE = '/content/drive/MyDrive/BrainGen-Agent/data/borzoi_ready_sequences.pkl'
 OUTPUT_FILE = '/content/drive/MyDrive/BrainGen-Agent/data/genomic_embeddings_eg.pt'
 
-DEVICE = None
-MODEL = None
-
 def check_gpu():
     logger.info("检查GPU可用性...")
     
     if not torch.cuda.is_available():
         raise RuntimeError("GPU不可用！Borzoi模型的100kb推断在CPU上极慢，请启用GPU运行时。")
-    
-    global DEVICE
-    DEVICE = torch.device('cuda')
     
     gpu_name = torch.cuda.get_device_name(0)
     gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
@@ -34,7 +27,7 @@ def check_gpu():
     
     torch.cuda.empty_cache()
 
-def dna_to_onehot(sequence: str) -> torch.Tensor:
+def one_hot_encode(sequence: str) -> np.ndarray:
     mapping = {
         'A': [1, 0, 0, 0],
         'C': [0, 1, 0, 0],
@@ -54,97 +47,54 @@ def dna_to_onehot(sequence: str) -> torch.Tensor:
         if base in mapping:
             onehot[i, :] = mapping[base]
     
-    tensor = torch.tensor(onehot, dtype=torch.float32)
-    tensor = tensor.unsqueeze(0)
-    
-    return tensor
+    return onehot
 
 def load_borzoi_model():
-    global MODEL
-    
     logger.info("加载Borzoi模型...")
     
-    try:
-        from borzoi import Borzoi
-        from borzoi import load_model
-        
-        MODEL = load_model()
-        MODEL = MODEL.to(DEVICE)
-        MODEL.eval()
-        
-        logger.info("Borzoi模型加载成功")
-        
-        for param in MODEL.parameters():
-            param.requires_grad = False
-            
-    except ImportError:
-        logger.warning("未找到borzoi库，尝试使用enformer-pytorch...")
-        
-        try:
-            from enformer_pytorch import Enformer
-            from enformer_pytorch import load_enformer_weights
-            
-            MODEL = Enformer.from_pretrained('EleutherAI/enformer')
-            MODEL = MODEL.to(DEVICE)
-            MODEL.eval()
-            
-            logger.info("Enformer模型加载成功")
-            
-            for param in MODEL.parameters():
-                param.requires_grad = False
-                
-        except ImportError:
-            raise ImportError(
-                "未找到borzoi或enformer-pytorch库。\n"
-                "请安装: pip install borzoi 或 pip install enformer-pytorch"
-            )
+    from borzoi_pytorch import Borzoi
+    
+    model = Borzoi.from_pretrained('johahi/borzoi-replicate-0')
+    model = model.cuda()
+    model.eval()
+    
+    logger.info("Borzoi模型加载成功")
+    
+    for param in model.parameters():
+        param.requires_grad = False
+    
+    return model
 
-def extract_features(sequence: str) -> torch.Tensor:
-    onehot = dna_to_onehot(sequence)
-    onehot = onehot.to(DEVICE)
+def extract_embedding(model, sequence: str) -> torch.Tensor:
+    onehot = one_hot_encode(sequence)
+    onehot_tensor = torch.tensor(onehot, dtype=torch.float32).unsqueeze(0).cuda()
     
     with torch.no_grad():
-        try:
-            output = MODEL(onehot, return_embeddings=True)
+        with torch.autocast(device_type='cuda', dtype=torch.float16):
+            outputs = model(onehot_tensor, return_embeddings=True)
             
-            if isinstance(output, dict):
-                embedding = output.get('embeddings', output.get('hidden_states'))
-            elif isinstance(output, tuple):
-                embedding = output[-1]
+            if isinstance(outputs, dict):
+                embeddings = outputs.get('embeddings')
+            elif isinstance(outputs, tuple):
+                embeddings = outputs[0]
             else:
-                embedding = output
+                embeddings = outputs
             
-            if len(embedding.shape) == 3:
-                embedding = embedding.mean(dim=1)
-            elif len(embedding.shape) == 4:
-                embedding = embedding.mean(dim=[1, 2])
+            if len(embeddings.shape) == 3:
+                embedding = embeddings.mean(dim=1)
+            elif len(embeddings.shape) == 4:
+                embedding = embeddings.mean(dim=[1, 2])
+            else:
+                embedding = embeddings
             
             embedding = embedding.squeeze()
-            
-        except Exception as e:
-            logger.warning(f"标准提取失败，尝试备用方法: {str(e)}")
-            
-            with torch.no_grad():
-                output = MODEL(onehot)
-                
-                if isinstance(output, tuple):
-                    embedding = output[0]
-                else:
-                    embedding = output
-                
-                if len(embedding.shape) == 3:
-                    embedding = embedding.mean(dim=1)
-                elif len(embedding.shape) == 4:
-                    embedding = embedding.mean(dim=[1, 2])
-                
-                embedding = embedding.squeeze()
     
     return embedding.cpu()
 
 def process_sequences():
     check_gpu()
     
-    load_borzoi_model()
+    model = load_borzoi_model()
     
     logger.info(f"加载序列数据: {INPUT_FILE}")
     with open(INPUT_FILE, 'rb') as f:
@@ -165,7 +115,7 @@ def process_sequences():
         logger.info(f"  序列长度: {len(sequence)} bp")
         
         try:
-            embedding = extract_features(sequence)
+            embedding = extract_embedding(model, sequence)
             
             embeddings_dict[rsid] = embedding
             
@@ -173,6 +123,8 @@ def process_sequences():
             
         except Exception as e:
             logger.error(f"处理 {rsid} 失败: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             continue
         
         torch.cuda.empty_cache()
